@@ -1,0 +1,12 @@
+
+record_id,feedback,reference_themes,label_status
+R01,Negative portfolio returns,Performance uncertainty,Human-approved illustrative label
+R02,Units not visible,Operational understanding,Human-approved illustrative label
+R03,NAV confusion,Operational understanding,Human-approved illustrative label
+R04,Market fluctuations,Performance uncertainty,Human-approved illustrative label
+R05,Other funds showing better returns,Investment knowledge|Performance uncertainty,Human-approved illustrative label
+R06,Automatic deduction concerns,Operational understanding|Financial flexibility,Human-approved illustrative label
+R07,Unexpected family expenses,Financial flexibility,Human-approved illustrative label
+R08,Confusion about fund categories,Investment knowledge,Human-approved illustrative label
+R09,Uncertainty about performance,Performance uncertainty,Human-approved illustrative label
+R10,Frequent market declines,Performance uncertainty,Human-approved illustrative label
