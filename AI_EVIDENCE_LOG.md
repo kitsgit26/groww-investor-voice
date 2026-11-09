@@ -15,17 +15,17 @@ The discovery engine is intended to organise qualitative feedback, identify recu
 
 | Attribute | Current status |
 |---|---|
-| Dataset | R01–R10 |
-| Number of records | 10 |
-| Data type | Illustrative practice data |
-| Original collection source | User-provided practice dataset |
-| Collection period | Not applicable |
-| Verified public feedback | None |
+| Dataset | R01–R10 illustrative; P11–P20 public-post paraphrases |
+| Number of records | 20 (10 illustrative + 10 public-post paraphrases) |
+| Data type | Mixed: 10 illustrative records and 10 sourced Reddit-post paraphrases |
+| Original collection source | Practice data + individually linked public Reddit posts |
+| Collection period | Public posts dated 2024–2026; reviewed 9 November 2026 |
+| Verified public feedback | 10 publicly accessible Reddit discussion posts; provenance links in public_feedback_records.csv |
 | Verified interviews | None |
 
 **Research integrity:** R01–R10 are illustrative practice records. They must not be represented as actual Groww customers, verified interviews, or feedback collected from public platforms.
 
-Potential future sources include Google Play Store reviews, Apple App Store reviews, Reddit investing communities, TradingQ&A, public YouTube comments, and public personal-finance forums. No collection from these platforms is claimed at this stage.
+Other potential sources include Google Play Store reviews, Apple App Store reviews, Reddit investing communities, TradingQ&A, public YouTube comments, and public personal-finance forums. Only the ten linked Reddit posts are claimed as public-source collection; other platforms have not been collected.
 
 ## 3. Classification taxonomy
 
@@ -53,7 +53,7 @@ The model's confidence field is an uncalibrated estimate, not a probability that
 
 ## 5. Golden evaluation dataset
 
-The current golden set contains ten human-approved **illustrative** labels in `golden_set.csv`. These are practice annotations, not independently validated labels or findings about actual investors.
+The expanded `golden_set.csv` contains 20 rows: R01–R10 illustrative practice labels and P11–P20 analyst-labelled paraphrases of linked public Reddit posts. The new labels are provisional and have not been independently adjudicated. `public_feedback_records.csv` preserves source links and dates. This is **not** a 20-person first-time-investor sample; the public posts' first-time status is mostly unknown.
 
 ## 6. Evaluation methodology and results
 
@@ -63,7 +63,7 @@ The evaluation compares `predictions.csv` with `golden_set.csv` using record IDs
 - Macro F1, averaging themes with at least one reference or predicted example. Themes with neither are unassessed and excluded.
 - Exact-match accuracy.
 
-Current results on the ten illustrative records:
+**Historical baseline, R01–R10 only:**
 
 | Metric | Result |
 |---|---:|
@@ -98,8 +98,8 @@ Human reviewers should verify:
 
 ## 8. Limitations and bias
 
-- Only ten illustrative records are available.
-- No verified public feedback has been collected.
+- The combined file has 20 rows, of which only 10 are sourced public feedback; 10 remain illustrative.
+- Ten public Reddit discussions were sourced and paraphrased; they are not verified Groww customers or necessarily first-time SIP investors.
 - No actual interview findings are included.
 - The sample cannot represent all first-time investors or Groww customers.
 - Reference labels have not been independently validated.
@@ -111,7 +111,7 @@ Human reviewers should verify:
 
 ## 9. Research integrity statement
 
-This project demonstrates a technical workflow using illustrative practice data. It does not claim verified customer findings, completed public-platform collection, actual investor interviews, improved SIP continuation, or production-level AI accuracy.
+This project demonstrates a technical workflow using illustrative practice data plus ten linked public Reddit discussions. It does not claim verified Groww customer findings, actual investor interviews, improved SIP continuation, or production-level AI accuracy.
 
 ## 10. Next steps
 
@@ -122,3 +122,10 @@ This project demonstrates a technical workflow using illustrative practice data.
 5. Evaluate groundedness, factual accuracy, safety, and fallback separately.
 6. Conduct and document primary research if participants can be recruited.
 7. Test the product with target users and record actual results.
+
+## 11. Public feedback expansion (9 November 2026)
+
+Ten public Reddit discussion posts were added as P11–P20. Each record is an **analyst paraphrase**, not a verbatim quote. Exact post URLs and original dates are recorded in `public_feedback_records.csv`. They represent self-reported public experiences, not verified events or platform performance facts. They were manually assigned provisional multi-label reference themes, requiring independent review.
+
+The expanded `predictions.csv` adds **deterministic keyword-rule predictions**, not GPT-4o-mini outputs. The previous 0.957 micro-F1 / 0.900 exact-match scores apply **only to the earlier 10 illustrative records**; they must not be presented as 20-record results. Run `python evaluate.py` to obtain new mixed-set rule-baseline metrics. The mixed set is not a valid estimate of model accuracy on genuine first-time Groww customers.
+
