@@ -1,6 +1,7 @@
 """Groww SIP Companion — educational, synthetic-data MVP (separate from discovery engine)."""
 import re
 import streamlit as st
+from sip_companion_ai import generate_explanation, select_topic, is_advice_request
 
 st.set_page_config(page_title="SIP Companion | Prototype", page_icon="🌱", layout="wide")
 
@@ -67,13 +68,74 @@ with tab2:
 
 with tab3:
     st.subheader("Ask a SIP question")
+    st.write("Explanations are based on a small, approved educational knowledge base.")
     choice = st.selectbox("Common question", ["Type my own question"] + list(GLOSSARY))
-    question = st.text_input("Your question (no personal or account information)", value="" if choice == "Type my own question" else choice)
+    question = st.text_input(
+        "Your question (no personal or account information)",
+        value="" if choice == "Type my own question" else choice,
+    )
+    answer_mode = st.radio(
+        "How to explain",
+        ["Approved text (offline)", "Grounded AI rephrasing (opt-in)"],
+        horizontal=True,
+        help="AI mode uses GPT-4o-mini with source grounding checks and a safe-text fallback.",
+    )
+    if answer_mode.startswith("Grounded"):
+        st.warning(
+            "If you opt in, your typed question and the approved educational text are "
+            "sent to the OpenAI API. Do not enter account numbers, names, contact details, "
+            "banking data or personal investment information."
+        )
+        consent = st.checkbox("I consent to sending this non-sensitive question to the AI provider.")
+    else:
+        consent = False
+
     if st.button("Explain", type="primary"):
-        st.write(educational_answer(question))
-        st.caption("Answer mode: approved, rule-routed educational knowledge base. No generative AI request was made.")
+        if answer_mode.startswith("Approved"):
+            st.write(educational_answer(question))
+            st.caption("Approved-text mode: no generative AI request.")
+        elif not consent:
+            st.error("Opt-in consent is required for AI explanations.")
+        elif not question.strip():
+            st.info("Enter a question or select a common question.")
+        elif re.search(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b|\b\d{10,}\b", question):
+            st.error("Please remove contact numbers, email addresses or long account-like numbers.")
+        else:
+            try:
+                api_key = st.secrets.get("OPENAI_API_KEY", "")
+            except Exception:
+                api_key = ""
+            client = None
+            if api_key:
+                try:
+                    from openai import OpenAI
+                    client = OpenAI(api_key=api_key)
+                except Exception:
+                    client = None
+            answer, status, reason = generate_explanation(question, GLOSSARY, client)
+            st.write(answer)
+            if status == "ai_pass":
+                st.caption(
+                    "AI-rephrased explanation passed configured schema, source quote, "
+                    "length, numeric and phrase checks. These limited checks do not "
+                    "guarantee factual accuracy; verify account specifics with your provider."
+                )
+            elif status == "refusal":
+                st.info("Safety refusal: personalised financial advice is outside scope.")
+            else:
+                st.warning("Approved-text fallback shown: " + reason)
+            topic = select_topic(question, GLOSSARY)
+            if topic and not is_advice_request(question):
+                with st.expander("Approved educational reference"):
+                    st.write(GLOSSARY[topic])
+                    st.caption("This is the grounding source used for the response.")
+
     with st.expander("Why is this called an MVP?"):
-        st.write("It tests whether plain-language explanations reduce confusion around SIP status, NAV, units and controls. The separate Investor Voice discovery engine finds problems; this prototype demonstrates a possible investor-facing solution.")
+        st.write(
+            "The separate AI Discovery Agent helps identify investor pain points. "
+            "This customer-facing prototype tests clear explanations of SIP status, "
+            "NAV, units and controls, with optional guarded AI rephrasing."
+        )
 
 st.divider()
 st.caption("SIP Companion | Synthetic demo | Educational only | No investment advice")
