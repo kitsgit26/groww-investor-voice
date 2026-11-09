@@ -3,7 +3,11 @@ import streamlit as st
 import pandas as pd
 import json
 import re
-from io import StringIO
+from openai import OpenAI
+
+# -----------------------------------------
+# APPLICATION CONFIGURATION
+# -----------------------------------------
 
 st.set_page_config(
     page_title="Groww Investor Voice",
@@ -11,14 +15,28 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 Groww Investor Voice")
-st.caption("AI-powered customer discovery and thematic analysis")
+MODEL = "gpt-4o-mini"
 
-st.warning(
-    "Research integrity: The built-in R01–R10 records are "
-    "illustrative practice data, not verified investor interviews "
-    "or public customer feedback."
-)
+THEMES = [
+    "Performance uncertainty",
+    "Operational understanding",
+    "Investment knowledge",
+    "Financial flexibility",
+    "External guidance seeking"
+]
+
+SENTIMENTS = [
+    "positive", "negative", "neutral", "mixed", "unclear"
+]
+
+LIFECYCLE_STAGES = [
+    "starting",
+    "early continuation",
+    "ongoing",
+    "pause consideration",
+    "discontinuation",
+    "unclear"
+]
 
 SAMPLE = pd.DataFrame([
     ["R01", "Negative portfolio returns", "Google search", "Yes", "Daily"],
@@ -36,7 +54,7 @@ SAMPLE = pd.DataFrame([
     "considered_stopping", "checking"
 ])
 
-THEMES = {
+RULES = {
     "Performance uncertainty": [
         "negative", "market fluctuation", "market decline",
         "performance", "returns"
@@ -59,104 +77,229 @@ THEMES = {
     ]
 }
 
+# -----------------------------------------
+# CLASSIFICATION AND FALLBACK
+# -----------------------------------------
+
 def classify_rules(text):
     text = str(text).lower()
-    result = []
-    for theme, keywords in THEMES.items():
-        if any(word in text for word in keywords):
-            result.append(theme)
-    return result or ["Unclassified"]
+    found = []
 
-def safe_fallback(text):
+    for theme, keywords in RULES.items():
+        if any(word in text for word in keywords):
+            found.append(theme)
+
+    return found or ["Unclassified"]
+
+
+def safe_fallback(text, reason="AI validation failed"):
     return {
         "themes": classify_rules(text),
-        "sentiment": "Not assessed",
+        "sentiment": "unclear",
         "emotion": ["Not established"],
-        "lifecycle_stage": "Unclear",
+        "lifecycle_stage": "unclear",
         "explicit_evidence": str(text),
         "root_cause_hypothesis": "Requires human review",
         "confidence": 0.0,
-        "review_status": "Fallback - human review required"
+        "review_status": "Fallback - human review required",
+        "gate_status": "FAIL - fallback activated",
+        "gate_errors": [reason]
     }
 
+
+# -----------------------------------------
+# AI CLASSIFICATION
+# -----------------------------------------
+
 def classify_ai(client, text):
-    prompt = f"""
-You are a cautious qualitative research assistant.
 
-Analyse this anonymised investor feedback item.
+    system_prompt = """
+You are a cautious qualitative research analyst.
 
-INPUT:
-{text}
+Your job is to classify anonymised investor feedback.
+You are NOT an investment adviser.
 
-Return ONLY valid JSON with these fields:
-{{
- "themes": ["one or more relevant themes"],
- "sentiment": "positive, negative, neutral, mixed, or unclear",
- "emotion": ["explicitly expressed emotions, or not stated"],
- "lifecycle_stage": "starting, early continuation, ongoing,
- pause consideration, discontinuation, or unclear",
- "explicit_evidence": "an exact short quotation from the input",
- "root_cause_hypothesis": "clearly marked hypothesis",
- "confidence": 0.0,
- "review_status": "pending human review"
-}}
+Use only these themes:
+- Performance uncertainty
+- Operational understanding
+- Investment knowledge
+- Financial flexibility
+- External guidance seeking
+
+Return a JSON object with:
+
+{
+  "themes": [],
+  "sentiment": "positive/negative/neutral/mixed/unclear",
+  "emotion": [],
+  "lifecycle_stage": "starting/early continuation/ongoing/pause consideration/discontinuation/unclear",
+  "explicit_evidence": "",
+  "root_cause_hypothesis": "",
+  "confidence": 0.0
+}
 
 Rules:
-- Use multiple themes where justified.
-- Never invent facts.
-- Never infer age, income, gender or sensitive characteristics.
-- Distinguish explicit statements from hypotheses.
-- Do not give investment advice.
-- If evidence is insufficient, say unclear.
-- Confidence is a model estimate, not a calibrated probability.
+
+1. Use multiple themes only when supported.
+2. Evidence must be copied exactly from the input.
+3. Never invent user experiences or motivations.
+4. Separate explicit evidence from hypotheses.
+5. Never infer age, income, gender or sensitive characteristics.
+6. Do not recommend mutual funds, stocks or portfolio changes.
+7. Do not predict investment returns.
+8. Use unclear when evidence is insufficient.
+9. Confidence is an uncalibrated model estimate.
+10. Do not treat an AI hypothesis as a verified finding.
 """
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=MODEL,
         messages=[
+            {"role": "system", "content": system_prompt},
             {
-                "role": "system",
-                "content": "You perform careful qualitative research classification."
-            },
-            {"role": "user", "content": prompt}
+                "role": "user",
+                "content": "Classify this feedback:\n" + str(text)
+            }
         ],
         response_format={"type": "json_object"},
         temperature=0
     )
 
-    return json.loads(response.choices[0].message.content)
+    content = response.choices[0].message.content
+
+    if not content:
+        raise ValueError("AI returned an empty response")
+
+    return json.loads(content)
+
+
+# -----------------------------------------
+# OUTPUT VALIDATION GATE
+# -----------------------------------------
 
 def validate_result(result, original):
+
     errors = []
 
-    quote = str(result.get("explicit_evidence", ""))
-    if not quote.strip() or quote.lower() not in original.lower():
-        errors.append("Evidence quotation is not present in original text")
+    required_fields = [
+        "themes",
+        "sentiment",
+        "emotion",
+        "lifecycle_stage",
+        "explicit_evidence",
+        "root_cause_hypothesis",
+        "confidence"
+    ]
 
-    themes = result.get("themes")
-    if not isinstance(themes, list) or not themes:
-        errors.append("Missing valid theme list")
+    for field in required_fields:
+        if field not in result:
+            errors.append("Missing field: " + field)
 
-    confidence = result.get("confidence")
-    if not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+    if errors:
+        return errors
+
+    if not isinstance(result["themes"], list):
+        errors.append("Themes must be a list")
+    else:
+        if not result["themes"]:
+            errors.append("No themes provided")
+
+        unknown = [
+            t for t in result["themes"]
+            if t not in THEMES
+        ]
+
+        if unknown:
+            errors.append("Unknown themes returned")
+
+    if result["sentiment"] not in SENTIMENTS:
+        errors.append("Invalid sentiment")
+
+    if not isinstance(result["emotion"], list):
+        errors.append("Emotion must be a list")
+
+    if result["lifecycle_stage"] not in LIFECYCLE_STAGES:
+        errors.append("Invalid lifecycle stage")
+
+    quote = result["explicit_evidence"]
+
+    if not isinstance(quote, str) or not quote.strip():
+        errors.append("Missing evidence quotation")
+    elif quote.lower() not in str(original).lower():
+        errors.append("Evidence quotation not grounded in original text")
+
+    hypothesis = result["root_cause_hypothesis"]
+
+    if not isinstance(hypothesis, str):
+        errors.append("Invalid root cause hypothesis")
+
+    confidence = result["confidence"]
+
+    if (
+        not isinstance(confidence, (int, float))
+        or isinstance(confidence, bool)
+        or not 0 <= confidence <= 1
+    ):
         errors.append("Invalid confidence value")
 
-    # Conservative check for potentially advisory output.
-    hypothesis = str(result.get("root_cause_hypothesis", "")).lower()
+    # Conservative safety screening
+    all_text = json.dumps(result).lower()
+
     unsafe_phrases = [
         "buy this fund",
         "sell this fund",
         "invest in this stock",
         "switch to this fund",
-        "time the market"
+        "time the market",
+        "guaranteed returns",
+        "you should invest"
     ]
 
-    if any(p in hypothesis for p in unsafe_phrases):
-        errors.append("Potential investment advice")
+    if any(p in all_text for p in unsafe_phrases):
+        errors.append("Potential investment advice detected")
 
     return errors
 
-# Sidebar
+
+# -----------------------------------------
+# API CLIENT
+# -----------------------------------------
+
+def get_client():
+
+    try:
+        api_key = st.secrets["OPENAI_API_KEY"]
+
+        if not api_key:
+            return None
+
+        return OpenAI(api_key=api_key)
+
+    except Exception:
+        return None
+
+
+# -----------------------------------------
+# INTERFACE
+# -----------------------------------------
+
+st.title("📊 Groww Investor Voice")
+
+st.caption(
+    "AI-powered customer discovery and thematic analysis"
+)
+
+st.warning(
+    "Research integrity: Built-in R01-R10 records are "
+    "illustrative practice data, not verified investor interviews "
+    "or public customer feedback."
+)
+
+st.info(
+    "Independent academic prototype. Not affiliated with Groww. "
+    "This tool does not provide investment advice."
+)
+
 st.sidebar.header("Research controls")
 
 mode = st.sidebar.radio(
@@ -164,16 +307,9 @@ mode = st.sidebar.radio(
     ["Practice / Rule-based", "AI classification"]
 )
 
-st.sidebar.info(
-    "AI mode sends the selected feedback text to the configured "
-    "AI provider. Use only anonymised, non-sensitive text."
-)
-
-api_key = ""
 if mode == "AI classification":
-    api_key = st.sidebar.text_input(
-        "OpenAI API key",
-        type="password"
+    st.sidebar.success(
+        "API credentials are loaded securely from Streamlit Secrets."
     )
 
 uploaded = st.file_uploader(
@@ -181,90 +317,175 @@ uploaded = st.file_uploader(
     type=["csv"]
 )
 
-if uploaded:
-    df = pd.read_csv(uploaded)
-    st.success("CSV uploaded successfully")
-else:
-    df = SAMPLE.copy()
-    st.info("Using the built-in illustrative practice dataset.")
+try:
+    if uploaded:
+        df = pd.read_csv(uploaded)
+        st.success("CSV uploaded successfully.")
+    else:
+        df = SAMPLE.copy()
+        st.info("Using illustrative practice dataset.")
+
+except Exception as e:
+    st.error("Could not read CSV: " + str(e))
+    st.stop()
+
+if df.empty:
+    st.error("The uploaded dataset is empty.")
+    st.stop()
 
 st.subheader("1. Feedback dataset")
+
 st.dataframe(df, use_container_width=True)
 
 text_column = st.selectbox(
     "Select the column containing feedback text",
     df.columns,
-    index=list(df.columns).index("confusion")
-    if "confusion" in df.columns else 0
+    index=(
+        list(df.columns).index("confusion")
+        if "confusion" in df.columns else 0
+    )
 )
 
 if st.button("Analyse feedback", type="primary"):
-    results = []
 
     client = None
 
     if mode == "AI classification":
-        if not api_key:
-            st.error("Enter an API key to use AI mode.")
+
+        client = get_client()
+
+        if client is None:
+            st.error(
+                "OpenAI API key not found. Check Streamlit "
+                "Community Cloud → App settings → Secrets."
+            )
             st.stop()
 
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=api_key)
-        except Exception as e:
-            st.error(f"Could not initialise AI client: {e}")
-            st.stop()
+    results = []
 
     progress = st.progress(0)
 
     for i, row in df.iterrows():
+
         original = str(row[text_column])
 
-        if mode == "AI classification":
+        if not original.strip() or original.lower() == "nan":
+            result = safe_fallback(
+                original,
+                "Empty feedback text"
+            )
+
+        elif mode == "AI classification":
+
             try:
-                result = classify_ai(client, original)
-                errors = validate_result(result, original)
+                ai_result = classify_ai(client, original)
+
+                errors = validate_result(ai_result, original)
 
                 if errors:
-                    result = safe_fallback(original)
-                    result["gate_errors"] = errors
+                    result = safe_fallback(
+                        original,
+                        "; ".join(errors)
+                    )
+
                 else:
-                    result["review_status"] = "Pending human review"
+                    result = ai_result
+
+                    result["review_status"] = (
+                        "Pending human review"
+                    )
+
+                    result["gate_status"] = (
+                        "PASS - output validation checks passed"
+                    )
+
                     result["gate_errors"] = []
 
-            except Exception as e:
-                result = safe_fallback(original)
-                result["gate_errors"] = [str(e)]
+            except Exception:
+                result = safe_fallback(
+                    original,
+                    "AI request or response processing failed"
+                )
 
         else:
-            result = safe_fallback(original)
-            result["review_status"] = "Rule-based demonstration"
+
+            result = safe_fallback(
+                original,
+                "Rule-based demonstration"
+            )
+
+            result["review_status"] = (
+                "Rule-based demonstration"
+            )
+
+            result["gate_status"] = (
+                "Not evaluated as AI"
+            )
+
             result["gate_errors"] = []
 
         result["record_id"] = str(row.get("ID", i))
         result["original_text"] = original
+
         results.append(result)
 
-        progress.progress((len(results)) / len(df))
+        progress.progress(
+            len(results) / len(df)
+        )
 
     st.session_state["results"] = pd.DataFrame(results)
     st.session_state["source_data"] = df.copy()
+    st.session_state["analysis_mode"] = mode
+
+
+# -----------------------------------------
+# RESULTS
+# -----------------------------------------
 
 if "results" in st.session_state:
+
     results = st.session_state["results"]
 
     st.divider()
     st.subheader("2. Analysis overview")
 
     total = len(results)
-    fallback = results["review_status"].astype(str).str.contains(
+
+    fallback_count = results[
+        "review_status"
+    ].astype(str).str.contains(
         "Fallback"
     ).sum()
 
+    passed = results[
+        "gate_status"
+    ].astype(str).str.startswith("PASS").sum()
+
     c1, c2, c3 = st.columns(3)
+
     c1.metric("Records analysed", total)
-    c2.metric("Fallback records", int(fallback))
-    c3.metric("Human review required", total)
+    c2.metric("Validated AI outputs", int(passed))
+    c3.metric("Fallback records", int(fallback_count))
+
+    if st.session_state.get("analysis_mode") == "AI classification":
+
+        if fallback_count == 0:
+            st.success(
+                "All individual outputs passed the configured "
+                "structural, evidence and safety screening checks. "
+                "Human review is still required."
+            )
+        else:
+            st.warning(
+                "Some AI outputs failed validation and were "
+                "replaced with rule-based fallback results."
+            )
+
+    else:
+        st.info(
+            "Practice mode uses rule-based classification. "
+            "No AI quality claim is made."
+        )
 
     st.subheader("3. Classification results")
 
@@ -277,7 +498,8 @@ if "results" in st.session_state:
         "explicit_evidence",
         "root_cause_hypothesis",
         "confidence",
-        "review_status"
+        "review_status",
+        "gate_status"
     ]
 
     st.dataframe(
@@ -288,6 +510,7 @@ if "results" in st.session_state:
     st.subheader("4. Theme frequency")
 
     exploded = results.explode("themes")
+
     counts = (
         exploded.groupby("themes")["record_id"]
         .nunique()
@@ -301,11 +524,25 @@ if "results" in st.session_state:
         "Theme counts can overlap because classification is multi-label."
     )
 
-    st.subheader("5. Human validation")
+    st.subheader("5. Validation errors")
+
+    for _, row in results.iterrows():
+
+        errors = row.get("gate_errors", [])
+
+        if isinstance(errors, list) and errors:
+            with st.expander(
+                "Record " + str(row["record_id"])
+            ):
+                for error in errors:
+                    st.write("- " + str(error))
+
+    st.subheader("6. Human validation")
 
     st.write(
-        "AI classifications are provisional. A human researcher "
-        "must review each record before it is used as a research finding."
+        "All classifications remain provisional. "
+        "Review original feedback before using any output "
+        "as a research finding."
     )
 
     st.download_button(
@@ -323,6 +560,7 @@ if "results" in st.session_state:
     )
 
 st.divider()
+
 st.caption(
     "Groww Investor Voice | Independent academic prototype | "
     "Not affiliated with Groww | Not investment advice"
