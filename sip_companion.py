@@ -98,7 +98,7 @@ with tab3:
             st.error("Opt-in consent is required for AI explanations.")
         elif not question.strip():
             st.info("Enter a question or select a common question.")
-        elif re.search(r"\\b[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}\\b|\\b\\d{10,}\\b", question):
+        elif re.search(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b|\b\d{10,}\b", question):
             st.error("Please remove contact numbers, email addresses or long account-like numbers.")
         else:
             try:
