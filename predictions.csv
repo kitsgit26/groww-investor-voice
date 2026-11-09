@@ -1,4 +1,3 @@
-
 record_id,predicted_themes
 R01,Performance uncertainty
 R02,Operational understanding
@@ -10,3 +9,13 @@ R07,Financial flexibility
 R08,Investment knowledge
 R09,Performance uncertainty
 R10,Performance uncertainty
+"P11","Operational understanding"
+"P12","Operational understanding"
+"P13","Operational understanding"
+"P14","Unclassified"
+"P15","Operational understanding"
+"P16","Unclassified"
+"P17","Operational understanding"
+"P18","Unclassified"
+"P19","External guidance seeking"
+"P20","Unclassified"
