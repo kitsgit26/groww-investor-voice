@@ -1,4 +1,3 @@
-
 record_id,feedback,reference_themes,label_status
 R01,Negative portfolio returns,Performance uncertainty,Human-approved illustrative label
 R02,Units not visible,Operational understanding,Human-approved illustrative label
@@ -10,3 +9,13 @@ R07,Unexpected family expenses,Financial flexibility,Human-approved illustrative
 R08,Confusion about fund categories,Investment knowledge,Human-approved illustrative label
 R09,Uncertainty about performance,Performance uncertainty,Human-approved illustrative label
 R10,Frequent market declines,Performance uncertainty,Human-approved illustrative label
+"P11","SIP instalment failed due to insufficient bank balance; poster asks about the missed payment and bank penalty.","Operational understanding|Financial flexibility","Analyst-labelled public post paraphrase; independent review pending"
+"P12","Investor reports SIP NAV and unit allotment delayed by two to four days compared with expected timing.","Operational understanding","Analyst-labelled public post paraphrase; independent review pending"
+"P13","Mandate payment was debited but mutual fund units remained unallotted after the expected date; order showed processing.","Operational understanding","Analyst-labelled public post paraphrase; independent review pending"
+"P14","Investor considers pausing monthly SIP contributions to manage a major wedding expense.","Financial flexibility","Analyst-labelled public post paraphrase; independent review pending"
+"P15","After requesting SIP cancellation, the following instalment was deducted while cancellation status remained pending.","Operational understanding","Analyst-labelled public post paraphrase; independent review pending"
+"P16","Investor says a SIP order showed cancelled but the money was still deducted; asks how the money can be recovered.","Operational understanding","Analyst-labelled public post paraphrase; independent review pending"
+"P17","Poster reports a rejected SIP order with funds not yet refunded and seeks guidance on the transaction status.","Operational understanding","Analyst-labelled public post paraphrase; independent review pending"
+"P18","Investor cancelled SIPs in an app and received an email but was still debited; the cancellation request had not been processed.","Operational understanding|Financial flexibility","Analyst-labelled public post paraphrase; independent review pending"
+"P19","New investor could not locate the SIP cancellation control, searched Google, disabled autopay and worried about possible penalties.","Operational understanding|Investment knowledge|External guidance seeking","Analyst-labelled public post paraphrase; independent review pending"
+"P20","Beginner asks what happens to existing mutual fund holdings after cancelling a SIP and whether restarting requires a new setup.","Operational understanding|Investment knowledge","Analyst-labelled public post paraphrase; independent review pending"
