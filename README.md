@@ -1,5 +1,12 @@
 # Groww Investor Voice
 
+## Live applications
+
+- **AI Discovery Agent (research-facing):** https://groww-investor-voice-i2aw42qb6vsvq8nbgwgkyl.streamlit.app/ — qualitative feedback analysis via `app.py`.
+- **SIP Companion MVP (investor-facing):** https://groww-investor-voice-fwx2smz42cubonckwmo7ne.streamlit.app/ — educational SIP explanations via `sip_companion.py` (deployment URL supplied by project owner; runtime checks pending).
+
+The discovery engine and investor-facing MVP are **different applications** with different users and hypotheses. For MVP evaluation and AI-mode configuration see `SIP_COMPANION_README.md`. Neither is affiliated with Groww or provides investment advice.
+
 An independent AI-powered customer-discovery prototype exploring first-time mutual fund investor experiences. This is an academic prototype and is not affiliated with Groww.
 
 ## Features
